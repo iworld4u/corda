@@ -7,7 +7,6 @@ import net.corda.core.contracts.UpgradedContract
 import net.corda.core.crypto.SecureHash
 import net.corda.core.flows.FlowInitiator
 import net.corda.core.flows.FlowLogic
-import net.corda.core.flows.StateMachineRunId
 import net.corda.core.messaging.*
 import net.corda.core.node.NodeInfo
 import net.corda.core.node.services.NetworkMapCache
@@ -15,12 +14,12 @@ import net.corda.core.node.services.StateMachineTransactionMapping
 import net.corda.core.node.services.Vault
 import net.corda.core.transactions.SignedTransaction
 import net.corda.node.services.api.ServiceHubInternal
+import net.corda.node.services.messaging.getRpcContext
 import net.corda.node.services.messaging.requirePermission
 import net.corda.node.services.startFlowPermission
 import net.corda.node.services.statemachine.StateMachineManager
 import net.corda.node.utilities.transaction
 import org.bouncycastle.asn1.x500.X500Name
-import net.corda.nodeapi.CURRENT_RPC_USER
 import org.jetbrains.exposed.sql.Database
 import rx.Observable
 import java.io.InputStream
@@ -98,15 +97,17 @@ class CordaRPCOpsImpl(
 
     // TODO: Check that this flow is annotated as being intended for RPC invocation
     override fun <T : Any> startTrackedFlowDynamic(logicType: Class<out FlowLogic<T>>, vararg args: Any?): FlowProgressHandle<T> {
-        requirePermission(startFlowPermission(logicType))
-        val currentUser = FlowInitiator.RPC(CURRENT_RPC_USER.get().username)
+        val rpcContext = getRpcContext()
+        rpcContext.requirePermission(startFlowPermission(logicType))
+        val currentUser = FlowInitiator.RPC(rpcContext.currentUser.username)
         return services.invokeFlowAsync(logicType, currentUser, *args).createHandle(hasProgress = true) as FlowProgressHandle<T>
     }
 
     // TODO: Check that this flow is annotated as being intended for RPC invocation
     override fun <T : Any> startFlowDynamic(logicType: Class<out FlowLogic<T>>, vararg args: Any?): FlowHandle<T> {
-        requirePermission(startFlowPermission(logicType))
-        val currentUser = FlowInitiator.RPC(CURRENT_RPC_USER.get().username)
+        val rpcContext = getRpcContext()
+        rpcContext.requirePermission(startFlowPermission(logicType))
+        val currentUser = FlowInitiator.RPC(rpcContext.currentUser.username)
         return services.invokeFlowAsync(logicType, currentUser, *args).createHandle(hasProgress = false)
     }
 

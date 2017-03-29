@@ -3,7 +3,6 @@
 
 package net.corda.core
 
-import com.google.common.base.Function
 import com.google.common.base.Throwables
 import com.google.common.io.ByteStreams
 import com.google.common.util.concurrent.*
@@ -397,6 +396,8 @@ data class ErrorOr<out A> private constructor(val value: A?, val error: Throwabl
             ErrorOr.of(error)
         }
     }
+
+    fun mapError(function: (Throwable) -> Throwable) = ErrorOr(value, error?.let(function))
 }
 
 /**

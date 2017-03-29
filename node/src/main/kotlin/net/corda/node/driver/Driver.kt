@@ -7,13 +7,10 @@ import com.google.common.util.concurrent.*
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigRenderOptions
 import net.corda.client.rpc.CordaRPCClient
-import net.corda.core.ThreadBox
+import net.corda.core.*
 import net.corda.core.crypto.Party
 import net.corda.core.crypto.X509Utilities
 import net.corda.core.crypto.commonName
-import net.corda.core.div
-import net.corda.core.flatMap
-import net.corda.core.map
 import net.corda.core.messaging.CordaRPCOps
 import net.corda.core.node.NodeInfo
 import net.corda.core.node.services.ServiceInfo
@@ -33,13 +30,12 @@ import net.corda.nodeapi.config.parseAs
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x500.X500NameBuilder
-import org.bouncycastle.asn1.x500.style.BCStyle
 import org.slf4j.Logger
 import java.io.File
 import java.net.*
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter
@@ -127,6 +123,26 @@ interface DriverDSLExposedInterface {
     fun startNetworkMapService()
 
     fun waitForAllNodesToFinish()
+
+    /**
+     * Polls a function until it returns a non-null value. Note that there is no timeout on the polling.
+     *
+     * @param pollName A description of what is being polled.
+     * @param pollInterval The interval of polling.
+     * @param warnCount The number of polls after the Driver gives a warning.
+     * @param check The function being polled.
+     * @return A future that completes with the non-null value [check] has returned.
+     */
+    fun <A> pollUntilNonNull(pollName: String, pollInterval: Duration = 500.millis, warnCount: Int = 120, check: () -> A?): ListenableFuture<A>
+    /**
+     * Polls the given function until it returns true.
+     * @see pollUntilNonNull
+     */
+    fun pollUntilTrue(pollName: String, pollInterval: Duration = 500.millis, warnCount: Int = 120, check: () -> Boolean): ListenableFuture<Unit> {
+        return pollUntilNonNull(pollName, pollInterval, warnCount) { if (check()) Unit else null }
+    }
+
+    val shutdownManager: ShutdownManager
 }
 
 interface DriverDSLInternalInterface : DriverDSLExposedInterface {
@@ -233,15 +249,13 @@ fun <DI : DriverDSLExposedInterface, D : DriverDSLInternalInterface, A> genericD
     var shutdownHook: Thread? = null
     try {
         driverDsl.start()
-        val returnValue = dsl(coerce(driverDsl))
         shutdownHook = Thread({
             driverDsl.shutdown()
         })
         Runtime.getRuntime().addShutdownHook(shutdownHook)
-        return returnValue
+        return dsl(coerce(driverDsl))
     } catch (exception: Throwable) {
-        println("Driver shutting down because of exception $exception")
-        exception.printStackTrace()
+        log.error("Driver shutting down because of exception", exception)
         throw exception
     } finally {
         driverDsl.shutdown()
@@ -288,7 +302,7 @@ fun addressMustNotBeBound(executorService: ScheduledExecutorService, hostAndPort
 fun <A> poll(
         executorService: ScheduledExecutorService,
         pollName: String,
-        pollIntervalMs: Long = 500,
+        pollInterval: Duration = 500.millis,
         warnCount: Int = 120,
         check: () -> A?
 ): ListenableFuture<A> {
@@ -303,7 +317,7 @@ fun <A> poll(
         executorService.schedule(task@ {
             counter++
             if (counter == warnCount) {
-                log.warn("Been polling $pollName for ${pollIntervalMs * warnCount / 1000.0} seconds...")
+                log.warn("Been polling $pollName for ${pollInterval.seconds * warnCount} seconds...")
             }
             val result = try {
                 check()
@@ -316,7 +330,7 @@ fun <A> poll(
             } else {
                 resultFuture.set(result)
             }
-        }, pollIntervalMs, MILLISECONDS)
+        }, pollInterval.toMillis(), MILLISECONDS)
     }
     schedulePoll()
     return resultFuture
@@ -343,7 +357,13 @@ class ShutdownManager(private val executorService: ExecutorService) {
             /** Could not get all of them, collect what we have */
             shutdownFutures.filter { it.isDone }.map { it.get() }
         }
-        shutdowns.reversed().forEach { it() }
+        shutdowns.reversed().forEach { shutdown ->
+            try {
+                shutdown()
+            } catch (throwable: Throwable) {
+                log.error("Exception while shutting down", throwable)
+            }
+        }
     }
 
     fun registerShutdown(shutdown: ListenableFuture<() -> Unit>) {
@@ -352,6 +372,7 @@ class ShutdownManager(private val executorService: ExecutorService) {
             registeredShutdowns.add(shutdown)
         }
     }
+    fun registerShutdown(shutdown: () -> Unit) = registerShutdown(Futures.immediateFuture(shutdown))
 
     fun registerProcessShutdown(processFuture: ListenableFuture<Process>) {
         val processShutdown = processFuture.map { process ->
@@ -385,8 +406,10 @@ class DriverDSL(
 ) : DriverDSLInternalInterface {
     private val networkMapLegalName = DUMMY_MAP.name
     private val networkMapAddress = portAllocation.nextHostAndPort()
-    val executorService: ListeningScheduledExecutorService = MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(2))
-    val shutdownManager = ShutdownManager(executorService)
+    val executorService: ListeningScheduledExecutorService = MoreExecutors.listeningDecorator(
+            Executors.newScheduledThreadPool(2, ThreadFactoryBuilder().setNameFormat("driver-pool-thread-%d").build())
+    )
+    override val shutdownManager = ShutdownManager(executorService)
 
     class State {
         val processes = ArrayList<ListenableFuture<Process>>()
@@ -418,9 +441,6 @@ class DriverDSL(
 
     override fun shutdown() {
         shutdownManager.shutdown()
-
-        // Check that we shut down properly
-        addressMustNotBeBound(executorService, networkMapAddress).get()
         executorService.shutdown()
     }
 
@@ -428,8 +448,9 @@ class DriverDSL(
         val client = CordaRPCClient(nodeAddress, sslConfig)
         return poll(executorService, "for RPC connection") {
             try {
-                client.start(ArtemisMessagingComponent.NODE_USER, ArtemisMessagingComponent.NODE_USER)
-                return@poll client.proxy()
+                val connection = client.start(ArtemisMessagingComponent.NODE_USER, ArtemisMessagingComponent.NODE_USER)
+                shutdownManager.registerShutdown { connection.close() }
+                return@poll connection.proxy
             } catch(e: Exception) {
                 log.error("Exception $e, Retrying RPC connection at $nodeAddress")
                 null
@@ -589,6 +610,12 @@ class DriverDSL(
         log.info("Starting network-map-service")
         val startNode = startNode(executorService, config.parseAs<FullNodeConfiguration>(), config, quasarJarPath, debugPort, systemProperties)
         registerProcess(startNode)
+    }
+
+    override fun <A> pollUntilNonNull(pollName: String, pollInterval: Duration, warnCount: Int, check: () -> A?): ListenableFuture<A> {
+        val pollFuture = poll(executorService, pollName, pollInterval, warnCount, check)
+        shutdownManager.registerShutdown { pollFuture.cancel(true) }
+        return pollFuture
     }
 
     companion object {
