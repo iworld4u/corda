@@ -271,16 +271,6 @@ object X509Utilities {
      */
     data class CACertAndKey(val certificate: X509Certificate, val keyPair: KeyPair)
 
-
-    /**
-     * Create a de novo root self-signed X509 v3 CA cert and [KeyPair].
-     * @param commonName The Common (CN) field of the cert Subject will be populated with the domain string
-     * @return A data class is returned containing the new root CA Cert and its [KeyPair] for signing downstream certificates.
-     * Note the generated certificate tree is capped at max depth of 2 to be in line with commercially available certificates
-     */
-    @Deprecated("Use [createSelfSignedCACert(X500Name)] instead, specifying full legal name")
-    fun createSelfSignedCACert(commonName: String): CACertAndKey = createSelfSignedCACert(getDevX509Name(commonName))
-
     /**
      * Create a de novo root self-signed X509 v3 CA cert and [KeyPair].
      * @param subject the cert Subject will be populated with the domain string
@@ -323,18 +313,6 @@ object X509Utilities {
 
         return CACertAndKey(cert, keyPair)
     }
-
-    /**
-     * Create a de novo root intermediate X509 v3 CA cert and KeyPair.
-     * @param commonName The Common (CN) field of the cert Subject will be populated with the domain string
-     * @param certificateAuthority The Public certificate and KeyPair of the root CA certificate above this used to sign it
-     * @return A data class is returned containing the new intermediate CA Cert and its KeyPair for signing downstream certificates.
-     * Note the generated certificate tree is capped at max depth of 1 below this to be in line with commercially available certificates
-     */
-    @Deprecated("Use [createIntermediateCert(X500Name, CACertAndKey)] instead, specifying full legal name")
-    fun createIntermediateCert(commonName: String,
-                               certificateAuthority: CACertAndKey): CACertAndKey
-            = createIntermediateCert(getDevX509Name(commonName), certificateAuthority)
 
     /**
      * Create a de novo root intermediate X509 v3 CA cert and KeyPair.
@@ -549,8 +527,8 @@ object X509Utilities {
                                       trustStoreFilePath: Path,
                                       trustStorePassword: String
     ): KeyStore {
-        val rootCA = createSelfSignedCACert(getDevX509Name("Corda Node Root CA"))
-        val intermediateCA = createIntermediateCert(getDevX509Name("Corda Node Intermediate CA"), rootCA)
+        val rootCA = createSelfSignedCACert(X500Name("CN=Corda Node Root CA,OU=Corda QA Department,O=R3 CEV,L=New York,C=US"))
+        val intermediateCA = createIntermediateCert(X500Name("CN=Corda Node Intermediate CA,OU=Corda QA Department,O=R3 CEV,L=New York,C=US"), rootCA)
 
         val keyPass = keyPassword.toCharArray()
         val keyStore = loadOrCreateKeyStore(keyStoreFilePath, storePassword)
