@@ -75,7 +75,7 @@ abstract class AbstractClientRPCTest {
             override val users: List<User> get() = listOf(rpcUser)
         }
 
-        val dispatcher = object : RPCDispatcher(rpcImpl, userService, X500Name(ALICE.name)) {
+        val dispatcher = object : RPCDispatcher(rpcImpl, userService, ALICE.name) {
             override fun send(data: SerializedBytes<*>, toAddress: String) {
                 val msg = serverSession.createMessage(false).apply {
                     writeBodyBufferBytes(data.bytes)

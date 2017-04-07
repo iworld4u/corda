@@ -29,11 +29,11 @@ class TxKeyFlowUtilitiesTests {
         val notaryNode = net.createNotaryNode(null, DUMMY_NOTARY.name)
         val aliceNode = net.createPartyNode(notaryNode.info.address, ALICE.name)
         val bobNode = net.createPartyNode(notaryNode.info.address, BOB.name)
-        val bobKey: Party = bobNode.services.myInfo.legalIdentity
+        val bob: Party = bobNode.services.myInfo.legalIdentity
 
         // Run the flows
         bobNode.registerServiceFlow(TxKeyFlow.Requester::class) { TxKeyFlow.Provider(it) }
-        val requesterFlow = aliceNode.services.startFlow(TxKeyFlow.Requester(bobKey))
+        val requesterFlow = aliceNode.services.startFlow(TxKeyFlow.Requester(bob))
 
         // Get the results
         val actual: PublicKey = requesterFlow.resultFuture.get().first

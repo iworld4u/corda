@@ -139,7 +139,7 @@ class X509UtilitiesTest {
         val caCertAndKey = X509Utilities.loadCertificateAndKey(caKeyStore, "cakeypass", X509Utilities.CORDA_INTERMEDIATE_CA_PRIVATE_KEY)
 
         // Generate server cert and private key and populate another keystore suitable for SSL
-        X509Utilities.createKeystoreForSSL(tmpServerKeyStore, "serverstorepass", "serverkeypass", caKeyStore, "cakeypass", X500Name(MEGA_CORP.name))
+        X509Utilities.createKeystoreForSSL(tmpServerKeyStore, "serverstorepass", "serverkeypass", caKeyStore, "cakeypass", MEGA_CORP.name)
 
         // Load back server certificate
         val serverKeyStore = X509Utilities.loadKeyStore(tmpServerKeyStore, "serverstorepass")
@@ -148,7 +148,7 @@ class X509UtilitiesTest {
         serverCertAndKey.certificate.checkValidity(Date())
         serverCertAndKey.certificate.verify(caCertAndKey.certificate.publicKey)
 
-        assertTrue { serverCertAndKey.certificate.subjectDN.name.contains(X500Name(MEGA_CORP.name).commonName) }
+        assertTrue { serverCertAndKey.certificate.subjectDN.name.contains(MEGA_CORP.name.commonName) }
 
         // Now sign something with private key and verify against certificate public key
         val testData = "123456".toByteArray()
@@ -176,7 +176,7 @@ class X509UtilitiesTest {
                 "trustpass")
 
         // Generate server cert and private key and populate another keystore suitable for SSL
-        val keyStore = X509Utilities.createKeystoreForSSL(tmpServerKeyStore, "serverstorepass", "serverstorepass", caKeyStore, "cakeypass", X500Name(MEGA_CORP.name))
+        val keyStore = X509Utilities.createKeystoreForSSL(tmpServerKeyStore, "serverstorepass", "serverstorepass", caKeyStore, "cakeypass", MEGA_CORP.name)
         val trustStore = X509Utilities.loadKeyStore(tmpTrustStore, "trustpass")
 
         val context = SSLContext.getInstance("TLS")
@@ -249,7 +249,7 @@ class X509UtilitiesTest {
         val peerChain = clientSocket.session.peerCertificates
         val peerX500Principal = (peerChain[0] as X509Certificate).subjectX500Principal
         val x500name = X500Name(peerX500Principal.name)
-        assertEquals(X500Name(MEGA_CORP.name), x500name)
+        assertEquals(MEGA_CORP.name, x500name)
 
 
         val output = DataOutputStream(clientSocket.outputStream)
