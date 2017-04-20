@@ -1,5 +1,6 @@
 package net.corda.node.internal
 
+import io.requery.query.Order
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.StateAndRef
@@ -13,6 +14,7 @@ import net.corda.core.node.NodeInfo
 import net.corda.core.node.services.NetworkMapCache
 import net.corda.core.node.services.StateMachineTransactionMapping
 import net.corda.core.node.services.Vault
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.transactions.SignedTransaction
 import net.corda.node.services.api.ServiceHubInternal
 import net.corda.node.services.messaging.requirePermission
@@ -49,6 +51,24 @@ class CordaRPCOpsImpl(
         return database.transaction {
             val (vault, updates) = services.vaultService.track()
             Pair(vault.states.toList(), updates)
+        }
+    }
+
+    override fun <T : ContractState> vaultServiceQueryBy(criteria: QueryCriteria,
+                                                paging: QueryCriteria.PageSpecification?,
+                                                ordering: Order?): Iterable<StateAndRef<T>> {
+        return databaseTransaction(database) {
+            services.vaultService.queryBy<T>(criteria, paging, ordering)
+        }
+    }
+
+    @RPCReturnsObservables
+    override fun <T : ContractState> vaultServiceTrackBy(criteria: QueryCriteria,
+                                                paging: QueryCriteria.PageSpecification?,
+                                                ordering: Order?): Pair<Iterable<StateAndRef<T>>, Observable<Vault.Update>> {
+        return databaseTransaction(database) {
+            val (vault, updates) = services.vaultService.trackBy<T>(criteria, paging, ordering)
+            Pair(vault.toList(), updates)
         }
     }
 
