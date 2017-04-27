@@ -127,7 +127,7 @@ class VisualiserViewModel {
         }
     }
 
-    fun makeNodeWidget(forNode: MockNetwork.MockNode, type: String, label: String = "Bank of Bologna",
+    fun makeNodeWidget(forNode: MockNetwork.MockNode, type: String, label: String = "CN=Bank of Bologna,OU=Corda QA Department,O=R3 CEV,L=Bologna,C=IT",
                        nodeType: NetworkMapVisualiser.NodeType, index: Int): NodeWidget {
         fun emitRadarPulse(initialRadius: Double, targetRadius: Double, duration: Double): Pair<Circle, Animation> {
             val pulse = Circle(initialRadius).apply {
