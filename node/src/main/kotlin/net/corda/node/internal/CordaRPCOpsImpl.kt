@@ -66,7 +66,7 @@ class CordaRPCOpsImpl(
     @RPCReturnsObservables
     override fun <T : ContractState> vaultServiceTrackBy(criteria: QueryCriteria,
                                                          paging: PageSpecification,
-                                                         sorting: Sort): Vault.QueryResults<T> {
+                                                         sorting: Sort): Vault.PageAndUpdates<T> {
         return database.transaction {
             services.vaultService.trackBy<T>(criteria, paging, sorting)
         }
