@@ -21,7 +21,7 @@ import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.UntrustworthyData
 import net.corda.core.utilities.debug
 import net.corda.core.utilities.trace
-import net.corda.node.services.api.ServiceHubInternal
+import net.corda.node.services.api.*
 import net.corda.node.utilities.StrandLocalTransactionManager
 import net.corda.node.utilities.createTransaction
 import org.jetbrains.exposed.sql.Database
@@ -35,6 +35,8 @@ import java.sql.Connection
 import java.sql.SQLException
 import java.util.*
 import java.util.concurrent.TimeUnit
+
+class FlowPermissionException(message: String) : FlowException(message)
 
 class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
                               val logic: FlowLogic<R>,
@@ -232,6 +234,38 @@ class FlowStateMachineImpl<R>(override val id: StateMachineRunId,
             }
         }
         throw IllegalStateException("We were resumed after waiting for $hash but it wasn't found in our local storage")
+    }
+
+    // TODO Dummy implementation of access to application specific permission controls and audit logging
+    override fun checkFlowPermission(permissionName: String, extraAuditData: Map<String, String>) {
+        val permissionGranted = true // TODO define permission control service on ServiceHubInternal and actually check authorization.
+        val checkPermissionEvent = FlowPermissionAuditEventImpl(
+            serviceHub.clock.instant(),
+            flowInitiator,
+            "CheckFlowPermission.${logic.javaClass.name}.$permissionName",
+            "Flow Permission Required: $permissionName",
+            extraAuditData,
+            logic.javaClass,
+            id,
+            permissionName,
+            permissionGranted)
+        serviceHub.auditService.recordSystemAuditEvent(checkPermissionEvent)
+        if (!permissionGranted) {
+            throw FlowPermissionException("User $flowInitiator not permissioned for $permissionName on flow $id")
+        }
+    }
+
+    // TODO Dummy implementation of access to application specific audit logging
+    override fun recordAuditEvent(eventType: String, comment: String, extraAuditData: Map<String,String>) {
+         val flowAuditEvent = FlowAuditEventImpl(
+                    serviceHub.clock.instant(),
+                    flowInitiator,
+                 "FlowAuditEvent.${logic.javaClass.name}.$eventType",
+                    comment,
+                    extraAuditData,
+                    logic.javaClass,
+                    id)
+        serviceHub.auditService.recordSystemAuditEvent(flowAuditEvent)
     }
 
     /**

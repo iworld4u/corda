@@ -65,6 +65,7 @@ abstract class ServiceHubInternal : PluginServiceHub {
     abstract val flowLogicRefFactory: FlowLogicRefFactory
     abstract val schemaService: SchemaService
     abstract override val networkMapCache: NetworkMapCacheInternal
+    abstract val auditService: AuditService
 
     abstract val networkService: MessagingService
 

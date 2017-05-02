@@ -100,5 +100,13 @@ class InteractiveShellTest {
             get() = throw UnsupportedOperationException()
         override val flowInitiator: FlowInitiator
             get() = throw UnsupportedOperationException()
+
+        override fun checkFlowPermission(permissionName: String, extraAuditData: Map<String, String>) {
+            // Do nothing
+        }
+
+        override fun recordAuditEvent(eventType: String, comment: String, extraAuditData: Map<String, String>) {
+            // Do nothing
+        }
     }
 }

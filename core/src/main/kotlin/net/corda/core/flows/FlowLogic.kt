@@ -143,9 +143,29 @@ abstract class FlowLogic<out T> {
     }
 
     /**
+     * Flows can call this method ensure that the active FlowInitiator is authorised for a particular action.
+     * This provides fine grained control over application level permissions.
+     * An audit event is always recorded when this method is used.
+     * If the permission is not granted for the FlowInitiator a FlowException
+     * @param permissionName is a string representing the desired permission. Each flow is given a distinct namespace for these permissions.
+     * @param extraAuditData in the audit log for this permission check these extra key value pairs will be recorded
+     */
+    @Throws(FlowException::class)
+    fun checkFlowPermission(permissionName: String, extraAuditData: Map<String,String>) = stateMachine.checkFlowPermission(permissionName, extraAuditData)
+
+
+    /**
+     * Flows can call this method to record application level audit events
+     * @param eventType is a string representing the type of event. Each flow is given a distinct namespace for these names.
+     * @param comment a general human readable summary of the event.
+     * @param extraAuditData in the audit log for this permission check these extra key value pairs will be recorded.
+     */
+    fun recordAuditEvent(eventType: String, comment: String, extraAuditData: Map<String,String>) = stateMachine.recordAuditEvent(eventType, comment, extraAuditData)
+
+    /**
      * Override this to provide a [ProgressTracker]. If one is provided and stepped, the framework will do something
-     * helpful with the progress reports. If this flow is invoked as a subflow of another, then the
-     * tracker will be made a child of the current step in the parent. If it's null, this flow doesn't track
+     * helpful with the progress reports e.g record to the audit service. If this flow is invoked as a subflow of another,
+     * then the tracker will be made a child of the current step in the parent. If it's null, this flow doesn't track
      * progress.
      *
      * Note that this has to return a tracker before the flow is invoked. You can't change your mind half way
