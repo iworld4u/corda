@@ -12,6 +12,7 @@ import net.corda.core.div
 import net.corda.core.messaging.RPCOps
 import net.corda.core.random63BitValue
 import net.corda.core.utilities.ProcessUtilities
+import net.corda.core.utilities.loggerFor
 import net.corda.node.driver.*
 import net.corda.node.services.RPCUserService
 import net.corda.node.services.messaging.ArtemisMessagingServer
@@ -340,6 +341,7 @@ data class RPCDriverDSL(
     ): ListenableFuture<RpcServerHandle> {
         val hostAndPort = driverDSL.portAllocation.nextHostAndPort()
         return driverDSL.executorService.submit<RpcServerHandle> {
+            loggerFor<RPCDriverDSL>().info("Starting Netty RPC server on $hostAndPort")
             val artemisConfig = createRpcServerArtemisConfig(maxFileSize, maxBufferedBytesPerClient, driverDSL.driverDirectory / serverName, hostAndPort)
             val server = ActiveMQServerImpl(artemisConfig, SingleUserSecurityManager(rpcUser))
             server.start()

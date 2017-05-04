@@ -1,0 +1,25 @@
+apply plugin: 'kotlin'
+apply plugin: 'kotlin-kapt'
+apply plugin: 'idea'
+apply plugin: 'net.corda.plugins.publish-utils'
+
+description 'A javaagent to allow blacklisting of classes to instrument by Quasar'
+
+dependencies {
+    testCompile "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
+    testCompile "junit:junit:$junit_version"
+
+    // Requery: SQL based query & persistence for Kotlin
+    kapt "io.requery:requery-processor:$requery_version"
+
+    // For H2 database support in persistence
+    testCompile "com.h2database:h2:$h2_version"
+}
+
+sourceSets {
+    main {
+        kotlin {
+            srcDir "$buildDir/generated/source/kapt/main"
+        }
+    }
+}
