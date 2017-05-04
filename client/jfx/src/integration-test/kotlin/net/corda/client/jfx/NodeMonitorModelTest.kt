@@ -37,6 +37,7 @@ import net.corda.testing.expect
 import net.corda.testing.expectEvents
 import net.corda.testing.node.DriverBasedTest
 import net.corda.testing.sequence
+import org.bouncycastle.asn1.x500.X500Name
 import org.junit.Test
 import rx.Observable
 
