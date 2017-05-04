@@ -19,7 +19,7 @@ sealed class ConnectionDirection {
 
 class ArtemisTcpTransport {
     companion object {
-        const val VERIFY_PEER_COMMON_NAME = "corda.verifyPeerCommonName"
+        const val VERIFY_PEER_LEGAL_NAME = "corda.verifyPeerCommonName"
 
         // Restrict enabled Cipher Suites to AES and GCM as minimum for the bulk cipher.
         // Our self-generated certificates all use ECDSA for handshakes, but we allow classical RSA certificates to work
@@ -68,7 +68,7 @@ class ArtemisTcpTransport {
                         TransportConstants.ENABLED_CIPHER_SUITES_PROP_NAME to CIPHER_SUITES.joinToString(","),
                         TransportConstants.ENABLED_PROTOCOLS_PROP_NAME to "TLSv1.2",
                         TransportConstants.NEED_CLIENT_AUTH_PROP_NAME to true,
-                        VERIFY_PEER_COMMON_NAME to (direction as? ConnectionDirection.Outbound)?.expectedCommonName
+                        VERIFY_PEER_LEGAL_NAME to (direction as? ConnectionDirection.Outbound)?.expectedCommonName
                 )
                 options.putAll(tlsOptions)
             }

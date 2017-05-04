@@ -437,11 +437,11 @@ private class VerifyingNettyConnector(configuration: MutableMap<String, Any>?,
                                       protocolManager: ClientProtocolManager?) :
         NettyConnector(configuration, handler, listener, closeExecutor, threadPool, scheduledThreadPool, protocolManager) {
     private val server = configuration?.get(ArtemisMessagingServer::class.java.name) as? ArtemisMessagingServer
-    private val expectedCommonName: X500Name? = configuration?.get(ArtemisTcpTransport.VERIFY_PEER_COMMON_NAME) as X500Name?
+    private val expecteLegalName: X500Name? = configuration?.get(ArtemisTcpTransport.VERIFY_PEER_LEGAL_NAME) as X500Name?
 
     override fun createConnection(): Connection? {
         val connection = super.createConnection() as NettyConnection?
-        if (connection != null && expectedCommonName != null) {
+        if (connection != null && expecteLegalName != null) {
             val peerLegalName: X500Name = connection
                     .channel
                     .pipeline()
@@ -451,10 +451,9 @@ private class VerifyingNettyConnector(configuration: MutableMap<String, Any>?,
                     .peerPrincipal
                     .name
                     .let(::X500Name)
-            // TODO Verify on the entire principle (subject)
-            if (peerLegalName.commonName != expectedCommonName.commonName) {
+            if (peerLegalName != expecteLegalName) {
                 connection.close()
-                server!!.hostVerificationFail(peerLegalName, expectedCommonName)
+                server!!.hostVerificationFail(peerLegalName, expecteLegalName)
                 return null  // Artemis will keep trying to reconnect until it's told otherwise
             } else {
                 server!!.onTcpConnection(peerLegalName)

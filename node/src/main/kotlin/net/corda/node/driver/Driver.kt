@@ -483,8 +483,7 @@ class DriverDSL(
             val nameBuilder = X500NameBuilder(BCStyle.INSTANCE)
             nameBuilder.addRDN(BCStyle.CN, "${DUMMY_NOTARY.name.commonName} $it")
             DUMMY_NOTARY.name.rdNs.forEach { rdn ->
-                if (!rdn.isMultiValued &&
-                    rdn.first.type != BCStyle.CN) {
+                if (rdn.first.type != BCStyle.CN) {
                     nameBuilder.addRDN(rdn.first)
                 }
             }

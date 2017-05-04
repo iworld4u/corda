@@ -177,7 +177,7 @@ class MockStorageService(override val attachments: AttachmentStorage = MockAttac
  * @param nodeName Reflects the "instance" of the in-memory database.  Defaults to a random string.
  */
 // TODO: Can we use an X509 principal generator here?
-fun makeTestDataSourceProperties(nodeName: X500Name = X509Utilities.getDevX509Name(SecureHash.randomSHA256().toString())): Properties {
+fun makeTestDataSourceProperties(nodeName: String = SecureHash.randomSHA256().toString()): Properties {
     val props = Properties()
     props.setProperty("dataSourceClassName", "org.h2.jdbcx.JdbcDataSource")
     props.setProperty("dataSource.url", "jdbc:h2:mem:${nodeName}_persistence;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE")

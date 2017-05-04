@@ -18,10 +18,7 @@ data class ServiceInfo(val type: ServiceType, val name: X500Name? = null) {
             require(parts.size in 1..2) { "Invalid number of elements found" }
             val type = ServiceType.parse(parts[0])
             val name = parts.getOrNull(1)
-            val principal = if (name != null)
-                X500Name(name)
-            else
-                null
+            val principal = name?.let { X500Name(it) }
             return ServiceInfo(type, principal)
         }
     }

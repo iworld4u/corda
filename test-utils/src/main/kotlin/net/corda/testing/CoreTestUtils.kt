@@ -6,10 +6,8 @@ package net.corda.testing
 import com.google.common.net.HostAndPort
 import com.google.common.util.concurrent.ListenableFuture
 import net.corda.core.contracts.StateRef
-import net.corda.core.crypto.Party
-import net.corda.core.crypto.SecureHash
-import net.corda.core.crypto.X509Utilities
-import net.corda.core.crypto.generateKeyPair
+import net.corda.core.crypto.*
+import net.corda.core.crypto.X509Utilities.getX509Name
 import net.corda.core.flows.FlowLogic
 import net.corda.core.node.ServiceHub
 import net.corda.core.node.VersionInfo
@@ -29,6 +27,7 @@ import net.corda.testing.node.MockServices
 import net.corda.testing.node.makeTestDataSourceProperties
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.X500NameBuilder
 import org.bouncycastle.asn1.x500.style.BCStyle
 import java.net.ServerSocket
 import java.net.URL
@@ -164,7 +163,7 @@ data class TestNodeConfiguration(
         override val keyStorePassword: String = "cordacadevpass",
         override val trustStorePassword: String = "trustpass",
         override val rpcUsers: List<User> = emptyList(),
-        override val dataSourceProperties: Properties = makeTestDataSourceProperties(myLegalName),
+        override val dataSourceProperties: Properties = makeTestDataSourceProperties(myLegalName.commonName),
         override val emailAddress: String = "",
         override val exportJMXto: String = "",
         override val devMode: Boolean = true,
@@ -183,7 +182,7 @@ fun testConfiguration(baseDirectory: Path, legalName: X500Name, basePort: Int): 
             emailAddress = "",
             keyStorePassword = "cordacadevpass",
             trustStorePassword = "trustpass",
-            dataSourceProperties = makeTestDataSourceProperties(legalName),
+            dataSourceProperties = makeTestDataSourceProperties(legalName.commonName),
             certificateSigningService = URL("http://localhost"),
             rpcUsers = emptyList(),
             verifierType = VerifierType.InMemory,
@@ -208,4 +207,19 @@ fun configureTestSSL(legalName: X500Name = MEGA_CORP.name): SSLConfiguration = o
     init {
         configureDevKeyAndTrustStores(legalName)
     }
+}
+
+
+/**
+ * Return a bogus X.509 for testing purposes.
+ */
+fun getTestX509Name(commonName: String): X500Name {
+    // TODO: Consider if we want to make these more variable, i.e. different locations?
+    val nameBuilder = X500NameBuilder(BCStyle.INSTANCE)
+    nameBuilder.addRDN(BCStyle.CN, commonName)
+    nameBuilder.addRDN(BCStyle.O, "R3")
+    nameBuilder.addRDN(BCStyle.OU, "Corda QA Department")
+    nameBuilder.addRDN(BCStyle.L, "New York")
+    nameBuilder.addRDN(BCStyle.C, "US")
+    return nameBuilder.build()
 }
