@@ -12,6 +12,7 @@ import net.corda.core.crypto.generateKeyPair
 import net.corda.core.flows.FlowException
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowVersion
+import net.corda.core.flows.StartPeerFlow
 import net.corda.core.messaging.MessageRecipients
 import net.corda.core.node.services.PartyInfo
 import net.corda.core.node.services.ServiceInfo
@@ -54,7 +55,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class StateMachineManagerTests {
+class FlowFrameworkTests {
     companion object {
         init {
             LogHelper.setLevel("+net.corda.flow")
@@ -466,13 +467,6 @@ class StateMachineManagerTests {
                 .withMessage("Chain")
     }
 
-    private class SendAndReceiveFlow(val otherParty: Party, val payload: Any) : FlowLogic<Unit>() {
-        @Suspendable
-        override fun call() {
-            sendAndReceive<Any>(otherParty, payload)
-        }
-    }
-
     @Test
     fun `FlowException thrown and there is a 3rd unrelated party flow`() {
         val node3 = net.createNode(node1.info.address)
@@ -519,6 +513,7 @@ class StateMachineManagerTests {
 
     @Test
     fun `retry subFlow due to receiving FlowException`() {
+        @StartPeerFlow
         class AskForExceptionFlow(val otherParty: Party, val throwException: Boolean) : FlowLogic<String>() {
             @Suspendable
             override fun call(): String = sendAndReceive<String>(otherParty, throwException).unwrap { it }
@@ -607,10 +602,35 @@ class StateMachineManagerTests {
         }.withMessageContaining("Version")
     }
 
-    @FlowVersion(2)
-    private class UpgradedFlow(val otherParty: Party) : FlowLogic<Any>() {
+    @Test
+    fun `single level inlined sub-flow`() {
+        node2.registerServiceFlow(SendAndReceiveFlow::class) { SingleLevelInlinedSubFlow(it) }
+        val result = node1.services.startFlow(SendAndReceiveFlow(node2.info.legalIdentity, "Hello")).resultFuture
+        net.runNetwork()
+        assertThat(result.getOrThrow()).isEqualTo("HelloHello")
+    }
+
+    @Test
+    fun `double level inlined sub-flow`() {
+        node2.registerServiceFlow(SendAndReceiveFlow::class) { DoubleLevelInlinedSubFlow(it) }
+        val result = node1.services.startFlow(SendAndReceiveFlow(node2.info.legalIdentity, "Hello")).resultFuture
+        net.runNetwork()
+        assertThat(result.getOrThrow()).isEqualTo("HelloHello")
+    }
+
+    private class SingleLevelInlinedSubFlow(val otherParty: Party) : FlowLogic<Unit>() {
         @Suspendable
-        override fun call(): Any = receive<Any>(otherParty).unwrap { it }
+        override fun call() {
+            val payload = receive<String>(otherParty).unwrap { it }
+            subFlow(InlinedSendFlow(payload + payload, otherParty))
+        }
+    }
+
+    private class DoubleLevelInlinedSubFlow(val otherParty: Party) : FlowLogic<Unit>() {
+        @Suspendable
+        override fun call() {
+            subFlow(SingleLevelInlinedSubFlow(otherParty))
+        }
     }
 
 
@@ -662,15 +682,13 @@ class StateMachineManagerTests {
         }
     }
 
-    private fun sanitise(message: SessionMessage): SessionMessage {
-        return when (message) {
-            is SessionData -> message.copy(recipientSessionId = 0)
-            is SessionInit -> message.copy(initiatorSessionId = 0)
-            is SessionConfirm -> message.copy(initiatorSessionId = 0, initiatedSessionId = 0)
-            is NormalSessionEnd -> message.copy(recipientSessionId = 0)
-            is ErrorSessionEnd -> message.copy(recipientSessionId = 0)
-            else -> message
-        }
+    private fun sanitise(message: SessionMessage) = when (message) {
+        is SessionData -> message.copy(recipientSessionId = 0)
+        is SessionInit -> message.copy(initiatorSessionId = 0)
+        is SessionConfirm -> message.copy(initiatorSessionId = 0, initiatedSessionId = 0)
+        is NormalSessionEnd -> message.copy(recipientSessionId = 0)
+        is ErrorSessionEnd -> message.copy(recipientSessionId = 0)
+        else -> message
     }
 
     private infix fun MockNode.sent(message: SessionMessage): Pair<Int, SessionMessage> = Pair(id, message)
@@ -738,6 +756,16 @@ class StateMachineManagerTests {
         }
     }
 
+    private class SendAndReceiveFlow(val otherParty: Party, val payload: Any) : FlowLogic<Any>() {
+        @Suspendable
+        override fun call(): Any = sendAndReceive<Any>(otherParty, payload).unwrap { it }
+    }
+
+    private class InlinedSendFlow(val payload: String, val otherParty: Party) : FlowLogic<Unit>() {
+        @Suspendable
+        override fun call() = send(otherParty, payload)
+    }
+
     private class PingPongFlow(val otherParty: Party, val payload: Long) : FlowLogic<Unit>() {
         @Transient var receivedPayload: Long? = null
         @Transient var receivedPayload2: Long? = null
@@ -792,6 +820,12 @@ class StateMachineManagerTests {
             serviceHub.vaultService.unconsumedStates<Cash.State>().filter { true }
             send(otherParty, "Hello")
         }
+    }
+
+    @FlowVersion(2)
+    private class UpgradedFlow(val otherParty: Party) : FlowLogic<Any>() {
+        @Suspendable
+        override fun call(): Any = receive<Any>(otherParty).unwrap { it }
     }
 
     //endregion Helpers

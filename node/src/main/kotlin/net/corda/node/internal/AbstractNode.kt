@@ -136,7 +136,12 @@ abstract class AbstractNode(open val configuration: NodeConfiguration,
         }
 
         override fun registerServiceFlow(clientFlowClass: Class<out FlowLogic<*>>, serviceFlowFactory: (Party) -> FlowLogic<*>) {
-            require(clientFlowClass !in serviceFlowFactories) { "${clientFlowClass.name} has already been used to register a service flow" }
+            require(clientFlowClass.isAnnotationPresent(StartPeerFlow::class.java)) {
+                "${StartPeerFlow::class.java.name} is required for the client flow"
+            }
+            require(clientFlowClass !in serviceFlowFactories) {
+                "${clientFlowClass.name} has already been used to register a service flow"
+            }
             val version = clientFlowClass.flowVersion
             val info = ServiceFlowInfo.CorDapp(version, serviceFlowFactory)
             log.info("Registering service flow for ${clientFlowClass.name}: $info")
@@ -253,13 +258,16 @@ abstract class AbstractNode(open val configuration: NodeConfiguration,
     }
 
     /**
-     * @suppress
      * Installs a flow that's core to the Corda platform. Unlike CorDapp flows which are versioned individually using
      * [FlowVersion], core flows have the same version as the node's platform version. To cater for backwards compatibility
      * [serviceFlowFactory] provides a second parameter which is the platform version of the initiating party.
+     * @suppress
      */
     @VisibleForTesting
     fun installCoreFlow(clientFlowClass: KClass<out FlowLogic<*>>, serviceFlowFactory: (Party, Int) -> FlowLogic<*>) {
+        require(clientFlowClass.java.isAnnotationPresent(StartPeerFlow::class.java)) {
+            "${StartPeerFlow::class.java.name} is required for the client flow"
+        }
         require(!clientFlowClass.java.isAnnotationPresent(FlowVersion::class.java)) {
             "${FlowVersion::class.java.name} not applicable for core flows; their version is the node's platform version"
         }
@@ -296,7 +304,7 @@ abstract class AbstractNode(open val configuration: NodeConfiguration,
         // the identity key. But the infrastructure to make that easy isn't here yet.
         keyManagement = makeKeyManagementService()
         flowLogicFactory = initialiseFlowLogicFactory()
-        scheduler = NodeSchedulerService(services, flowLogicFactory, unfinishedSchedules = busyNodeLatch)
+        scheduler = NodeSchedulerService(services, database, flowLogicFactory, unfinishedSchedules = busyNodeLatch)
 
         val tokenizableServices = mutableListOf(storage, net, vault, keyManagement, identity, platformClock, scheduler)
         makeAdvertisedServices(tokenizableServices)

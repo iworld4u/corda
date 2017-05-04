@@ -16,6 +16,7 @@ interface PluginServiceHub : ServiceHub {
      * @param clientFlowClass [Class] of the client flow involved in this client-server communication.
      * @param serviceFlowFactory Lambda which produces a new service flow for each new client flow communication. The
      * [Party] parameter of the factory is the client's identity.
+     * @throws IllegalArgumentException If [clientFlowClass] is not annotated with [net.corda.core.flows.StartPeerFlow].
      */
     fun registerServiceFlow(clientFlowClass: Class<out FlowLogic<*>>, serviceFlowFactory: (Party) -> FlowLogic<*>)
 

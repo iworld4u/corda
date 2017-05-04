@@ -73,8 +73,7 @@ class FinalityFlow(val transactions: Iterable<SignedTransaction>,
 
     @Suspendable
     private fun notariseAndRecord(stxnsAndParties: List<Pair<SignedTransaction, Set<Party>>>): List<Pair<SignedTransaction, Set<Party>>> {
-        return stxnsAndParties.map { pair ->
-            val stx = pair.first
+        return stxnsAndParties.map { (stx, parties) ->
             val notarised = if (needsNotarySignature(stx)) {
                 val notarySignatures = subFlow(NotaryFlow.Client(stx))
                 stx + notarySignatures
@@ -82,7 +81,7 @@ class FinalityFlow(val transactions: Iterable<SignedTransaction>,
                 stx
             }
             serviceHub.recordTransactions(listOf(notarised))
-            Pair(notarised, pair.second)
+            notarised to parties
         }
     }
 
@@ -100,8 +99,7 @@ class FinalityFlow(val transactions: Iterable<SignedTransaction>,
     }
 
     private fun lookupParties(ltxns: List<Pair<SignedTransaction, LedgerTransaction>>): List<Pair<SignedTransaction, Set<Party>>> {
-        return ltxns.map { pair ->
-            val (stx, ltx) = pair
+        return ltxns.map { (stx, ltx) ->
             // Calculate who is meant to see the results based on the participants involved.
             val keys = ltx.outputs.flatMap { it.data.participants } + ltx.inputs.flatMap { it.state.data.participants }
             // TODO: Is it safe to drop participants we don't know how to contact? Does not knowing how to contact them count as a reason to fail?

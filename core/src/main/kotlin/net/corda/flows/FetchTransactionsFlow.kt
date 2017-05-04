@@ -2,6 +2,7 @@ package net.corda.flows
 
 import net.corda.core.crypto.Party
 import net.corda.core.crypto.SecureHash
+import net.corda.core.flows.StartPeerFlow
 import net.corda.core.transactions.SignedTransaction
 
 /**
@@ -12,6 +13,7 @@ import net.corda.core.transactions.SignedTransaction
  * results in a [FetchDataFlow.HashNotFound] exception. Note that returned transactions are not inserted into
  * the database, because it's up to the caller to actually verify the transactions are valid.
  */
+@StartPeerFlow
 class FetchTransactionsFlow(requests: Set<SecureHash>, otherSide: Party) :
         FetchDataFlow<SignedTransaction, SignedTransaction>(requests, otherSide) {
 

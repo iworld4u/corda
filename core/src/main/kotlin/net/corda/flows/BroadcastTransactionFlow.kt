@@ -3,6 +3,7 @@ package net.corda.flows
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.crypto.Party
 import net.corda.core.flows.FlowLogic
+import net.corda.core.flows.StartPeerFlow
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 
@@ -15,6 +16,7 @@ import net.corda.core.transactions.SignedTransaction
  * @param participants a list of participants involved in the transaction.
  * @return a list of participants who were successfully notified of the transaction.
  */
+@StartPeerFlow
 class BroadcastTransactionFlow(val notarisedTransaction: SignedTransaction,
                                val participants: Set<Party>) : FlowLogic<Unit>() {
     @CordaSerializable

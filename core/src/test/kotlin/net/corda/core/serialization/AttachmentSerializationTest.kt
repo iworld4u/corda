@@ -134,7 +134,7 @@ class AttachmentSerializationTest {
     }
 
     private fun launchFlow(clientLogic: ClientLogic, rounds: Int) {
-        server.services.registerFlowInitiator(clientLogic.javaClass, ::ServerLogic)
+        server.services.registerServiceFlow(clientLogic.javaClass, ::ServerLogic)
         client.services.startFlow(clientLogic)
         network.runNetwork(rounds)
     }

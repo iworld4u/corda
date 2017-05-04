@@ -1,5 +1,7 @@
 package net.corda.core.flows
 
+import kotlin.annotation.AnnotationTarget.CLASS
+
 /**
  * Annotation for initiating [FlowLogic]s to specify the version of their flow protocol. The version is a single integer
  * [value] which increments by one whenever a release is made where the flow protocol changes in any manner which is
@@ -15,4 +17,6 @@ package net.corda.core.flows
  * Defaults to a flow version of 1 if not specified.
  */
 // TODO Add support for multiple versions once CorDapps are loaded in separate class loaders
+@Target(CLASS)
+@MustBeDocumented
 annotation class FlowVersion(val value: Int)

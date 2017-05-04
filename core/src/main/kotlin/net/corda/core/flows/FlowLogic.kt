@@ -10,6 +10,8 @@ import net.corda.core.utilities.UntrustworthyData
 import net.corda.core.utilities.debug
 import org.slf4j.Logger
 import rx.Observable
+import java.lang.annotation.Inherited
+import kotlin.annotation.AnnotationTarget.CLASS
 
 /**
  * A sub-class of [FlowLogic<T>] implements a flow using direct, straight line blocking code. Thus you
@@ -32,7 +34,10 @@ abstract class FlowLogic<out T> {
     /** This is where you should log things to. */
     val logger: Logger get() = stateMachine.logger
 
-    /** Returns a wrapped [UUID] object that identifies this state machine run (i.e. subflows have the same identifier as their parents). */
+    /**
+     * Returns a wrapped [java.util.UUID] object that identifies this state machine run (i.e. subflows have the same
+     * identifier as their parents).
+     */
     val runId: StateMachineRunId get() = stateMachine.id
 
     /**
@@ -60,7 +65,9 @@ abstract class FlowLogic<out T> {
      *
      * @returns an [UntrustworthyData] wrapper around the received object.
      */
-    inline fun <reified R : Any> sendAndReceive(otherParty: Party, payload: Any) = sendAndReceive(R::class.java, otherParty, payload)
+    inline fun <reified R : Any> sendAndReceive(otherParty: Party, payload: Any): UntrustworthyData<R> {
+        return sendAndReceive(R::class.java, otherParty, payload)
+    }
 
     /**
      * Serializes and queues the given [payload] object for sending to the [otherParty]. Suspends until a response
@@ -75,7 +82,7 @@ abstract class FlowLogic<out T> {
      */
     @Suspendable
     open fun <R : Any> sendAndReceive(receiveType: Class<R>, otherParty: Party, payload: Any): UntrustworthyData<R> {
-        return stateMachine.sendAndReceive(receiveType, otherParty, payload, sessionFlow)
+        return stateMachine.sendAndReceive(receiveType, otherParty, payload, flowUsedForSessions)
     }
 
     /**
@@ -98,7 +105,7 @@ abstract class FlowLogic<out T> {
      */
     @Suspendable
     open fun <R : Any> receive(receiveType: Class<R>, otherParty: Party): UntrustworthyData<R> {
-        return stateMachine.receive(receiveType, otherParty, sessionFlow)
+        return stateMachine.receive(receiveType, otherParty, flowUsedForSessions)
     }
 
     /**
@@ -109,30 +116,25 @@ abstract class FlowLogic<out T> {
      * network's event horizon time.
      */
     @Suspendable
-    open fun send(otherParty: Party, payload: Any) = stateMachine.send(otherParty, payload, sessionFlow)
+    open fun send(otherParty: Party, payload: Any) = stateMachine.send(otherParty, payload, flowUsedForSessions)
 
     /**
      * Invokes the given subflow. This function returns once the subflow completes successfully with the result
-     * returned by that subflows [call] method. If the subflow has a progress tracker, it is attached to the
+     * returned by that subflow's [call] method. If the subflow has a progress tracker, it is attached to the
      * current step in this flow's progress tracker.
      *
-     * @param shareParentSessions In certain situations the need arises to use the same sessions the parent flow has
-     * already established. However this also prevents the subflow from creating new sessions with those parties.
-     * For this reason the default value is false.
+     *
      *
      * @throws FlowException This is either thrown by [subLogic] itself or propagated from any of the remote
-     * [FlowLogic]s it communicated with. A subflow retry can be done by catching this exception.
+     * [FlowLogic]s it communicated with. The subflow can be retried by catching this exception.
      */
-    // TODO Rethink the default value for shareParentSessions
-    // TODO shareParentSessions is a bit too low-level and perhaps can be expresed in a better way
     @Suspendable
-    @JvmOverloads
     @Throws(FlowException::class)
-    open fun <R> subFlow(subLogic: FlowLogic<R>, shareParentSessions: Boolean = false): R {
+    open fun <R> subFlow(subLogic: FlowLogic<R>): R {
         subLogic.stateMachine = stateMachine
         maybeWireUpProgressTracking(subLogic)
-        if (shareParentSessions) {
-            subLogic.sessionFlow = this
+        if (!subLogic.javaClass.isAnnotationPresent(StartPeerFlow::class.java)) {
+            subLogic.flowUsedForSessions = flowUsedForSessions
         }
         logger.debug { "Calling subflow: $subLogic" }
         val result = subLogic.call()
@@ -154,8 +156,7 @@ abstract class FlowLogic<out T> {
     open val progressTracker: ProgressTracker? = null
 
     /**
-     * This is where you fill out your business logic. The returned object will usually be ignored, but can be
-     * helpful if this flow is meant to be used as a subflow.
+     * This is where you fill out your business logic.
      */
     @Suspendable
     @Throws(FlowException::class)
@@ -170,7 +171,7 @@ abstract class FlowLogic<out T> {
     fun track(): Pair<String, Observable<String>>? {
         // TODO this is not threadsafe, needs an atomic get-step-and-subscribe
         return progressTracker?.let {
-            Pair(it.currentStep.toString(), it.changes.map { it.toString() })
+            it.currentStep.toString() to it.changes.map { it.toString() }
         }
     }
 
@@ -180,9 +181,7 @@ abstract class FlowLogic<out T> {
      * valid by the local node, but that doesn't imply the vault will consider it relevant.
      */
     @Suspendable
-    fun waitForLedgerCommit(hash: SecureHash): SignedTransaction {
-        return stateMachine.waitForLedgerCommit(hash, this)
-    }
+    fun waitForLedgerCommit(hash: SecureHash): SignedTransaction = stateMachine.waitForLedgerCommit(hash, this)
 
    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -199,8 +198,9 @@ abstract class FlowLogic<out T> {
             _stateMachine = value
         }
 
-    // This points to the outermost flow and is changed when a subflow is invoked.
-    private var sessionFlow: FlowLogic<*> = this
+    // This is the flow used for managing sessions. It defaults to the current flow but if this is an inlined sub-flow
+    // then it will point to the flow it's been inlined to.
+    private var flowUsedForSessions: FlowLogic<*> = this
 
     private fun maybeWireUpProgressTracking(subLogic: FlowLogic<*>) {
         val ours = progressTracker
@@ -214,3 +214,11 @@ abstract class FlowLogic<out T> {
         }
     }
 }
+
+
+/**
+ *
+ */
+@Target(CLASS)
+@Inherited
+annotation class StartPeerFlow
