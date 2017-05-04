@@ -76,7 +76,7 @@ object NotaryFlow {
         }
 
         private fun validateSignature(sig: DigitalSignature.WithKey, data: ByteArray) {
-            check(sig.by in notaryParty.owningKey.keys) { "Invalid signer ${sig.by.toStringShort()} for the notary result" }
+            check(sig.by in notaryParty.owningKey.keys) { "Invalid signer for the notary result" }
             sig.verifyWithECDSA(data)
         }
     }
