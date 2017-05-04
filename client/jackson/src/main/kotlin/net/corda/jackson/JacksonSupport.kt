@@ -17,6 +17,7 @@ import net.corda.core.serialization.OpaqueBytes
 import net.corda.core.serialization.deserialize
 import net.corda.core.serialization.serialize
 import net.i2p.crypto.eddsa.EdDSAPublicKey
+import org.bouncycastle.asn1.ASN1InputStream
 import org.bouncycastle.asn1.x500.X500Name
 import java.math.BigDecimal
 import java.security.PublicKey
@@ -91,6 +92,10 @@ object JacksonSupport {
             // For OpaqueBytes
             addDeserializer(OpaqueBytes::class.java, OpaqueBytesDeserializer)
             addSerializer(OpaqueBytes::class.java, OpaqueBytesSerializer)
+
+            // For X.500 distinguished names
+            addDeserializer(X500Name::class.java, X500NameDeserializer)
+            addSerializer(X500Name::class.java, X500NameSerializer)
         }
     }
 
@@ -155,6 +160,26 @@ object JacksonSupport {
             val mapper = parser.codec as PartyObjectMapper
             val principal = X500Name(parser.text)
             return mapper.partyFromPrincipal(principal) ?: throw JsonParseException(parser, "Could not find a Party with name ${principal}")
+        }
+    }
+
+    object X500NameSerializer : JsonSerializer<X500Name>() {
+        override fun serialize(obj: X500Name, generator: JsonGenerator, provider: SerializerProvider) {
+            generator.writeString(obj.toString())
+        }
+    }
+
+    object X500NameDeserializer : JsonDeserializer<X500Name>() {
+        override fun deserialize(parser: JsonParser, context: DeserializationContext): X500Name {
+            if (parser.currentToken == JsonToken.FIELD_NAME) {
+                parser.nextToken()
+            }
+
+            return try {
+                X500Name(parser.text)
+            } catch(ex: IllegalArgumentException) {
+                throw JsonParseException(parser, "Invalid X.500 name ${parser.text}: ${ex.message}", ex)
+            }
         }
     }
 
