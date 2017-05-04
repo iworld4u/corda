@@ -3,6 +3,7 @@ package net.corda.core.transactions
 import net.corda.core.contracts.AttachmentResolutionException
 import net.corda.core.contracts.NamedByHash
 import net.corda.core.contracts.TransactionResolutionException
+import net.corda.core.crypto.*
 import net.corda.core.node.ServiceHub
 import net.corda.core.crypto.DigitalSignature
 import net.corda.core.crypto.SecureHash
@@ -29,12 +30,12 @@ import java.util.*
  * sign.
  */
 data class SignedTransaction(val txBits: SerializedBytes<WireTransaction>,
+                             // TODO: Remove duplicate signer information between the wire transaction and signature
                              val sigs: List<DigitalSignature.WithKey>
 ) : NamedByHash {
     init {
         require(sigs.isNotEmpty())
     }
-
     // TODO: This needs to be reworked to ensure that the inner WireTransaction is only ever deserialised sandboxed.
 
     /** Lazily calculated access to the deserialised/hashed transaction data. */

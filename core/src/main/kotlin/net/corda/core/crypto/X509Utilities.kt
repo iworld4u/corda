@@ -93,7 +93,7 @@ object X509Utilities {
     /**
      * Encode provided public key in correct format for inclusion in certificate issuer/subject fields
      */
-    private fun createSubjectKeyIdentifier(key: Key): SubjectKeyIdentifier {
+    fun createSubjectKeyIdentifier(key: Key): SubjectKeyIdentifier {
         val info = SubjectPublicKeyInfo.getInstance(key.encoded)
         return BcX509ExtensionUtils().createSubjectKeyIdentifier(info)
     }
@@ -271,7 +271,7 @@ object X509Utilities {
 
     /**
      * Create a de novo root self-signed X509 v3 CA cert and [KeyPair].
-     * @param subject the cert Subject will be populated with the domain string
+     * @param subject the subject and issuer of the certificate
      * @return A data class is returned containing the new root CA Cert and its [KeyPair] for signing downstream certificates.
      * Note the generated certificate tree is capped at max depth of 2 to be in line with commercially available certificates
      */
@@ -310,6 +310,7 @@ object X509Utilities {
         cert.verify(pubKey)
 
         return CACertAndKey(cert, keyPair)
+
     }
 
     /**
@@ -323,7 +324,7 @@ object X509Utilities {
                                certificateAuthority: CACertAndKey): CACertAndKey {
         val keyPair = generateECDSAKeyPairForSSL()
 
-        val issuer = X509CertificateHolder(certificateAuthority.certificate.encoded).subject
+        val issuer = X500Name(certificateAuthority.certificate.issuerDN.name)
         val serial = BigInteger.valueOf(random63BitValue())
         val pubKey = keyPair.public
 
