@@ -75,7 +75,7 @@ val MINI_CORP: Party get() = Party(X509Utilities.getDevX509Name("MiniCorp"), MIN
 
 val BOC_KEY: KeyPair by lazy { generateKeyPair() }
 val BOC_PUBKEY: PublicKey get() = BOC_KEY.public
-val BOC: Party get() = Party(X500Name("CN=BankOfCorda,O=R3,OU=corda,L=New York,C=US"), BOC_PUBKEY)
+val BOC: Party get() = Party(getTestX509Name("BankOfCorda"), BOC_PUBKEY)
 val BOC_PARTY_REF = BOC.ref(OpaqueBytes.of(1)).reference
 
 val BIG_CORP_KEY: KeyPair by lazy { generateKeyPair() }
@@ -214,6 +214,7 @@ fun configureTestSSL(legalName: X500Name = MEGA_CORP.name): SSLConfiguration = o
  * Return a bogus X.509 for testing purposes.
  */
 fun getTestX509Name(commonName: String): X500Name {
+    require(!commonName.startsWith("CN="))
     // TODO: Consider if we want to make these more variable, i.e. different locations?
     val nameBuilder = X500NameBuilder(BCStyle.INSTANCE)
     nameBuilder.addRDN(BCStyle.CN, commonName)

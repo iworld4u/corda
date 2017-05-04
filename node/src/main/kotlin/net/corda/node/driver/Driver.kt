@@ -431,6 +431,7 @@ class DriverDSL(
         val rpcAddress = portAllocation.nextHostAndPort()
         val webAddress = portAllocation.nextHostAndPort()
         val debugPort = if (isDebug) debugPortAllocation.nextPort() else null
+        // TODO: Derive name from the full picked name, don't just wrap the common name
         val name = providedName ?:  X509Utilities.getDevX509Name("${pickA(name).commonName}-${p2pAddress.port}")
         val baseDirectory = driverDirectory / name.commonName
         val configOverrides = mapOf(

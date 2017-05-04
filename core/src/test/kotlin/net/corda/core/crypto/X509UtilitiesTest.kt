@@ -2,6 +2,7 @@ package net.corda.core.crypto
 
 import net.corda.core.div
 import net.corda.testing.MEGA_CORP
+import net.corda.testing.getTestX509Name
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.GeneralName
 import org.junit.Rule
@@ -31,7 +32,7 @@ class X509UtilitiesTest {
 
     @Test
     fun `create valid self-signed CA certificate`() {
-        val caCertAndKey = X509Utilities.createSelfSignedCACert(X500Name("CN=Test Cert,OU=Corda QA Department,O=R3 CEV,L=New York,C=US"))
+        val caCertAndKey = X509Utilities.createSelfSignedCACert(getTestX509Name("Test Cert"))
         assertTrue { caCertAndKey.certificate.subjectDN.name.contains("CN=Test Cert") } // using our subject common name
         assertEquals(caCertAndKey.certificate.issuerDN, caCertAndKey.certificate.subjectDN) //self-signed
         caCertAndKey.certificate.checkValidity(Date()) // throws on verification problems
@@ -43,7 +44,7 @@ class X509UtilitiesTest {
     @Test
     fun `load and save a PEM file certificate`() {
         val tmpCertificateFile = tempFile("cacert.pem")
-        val caCertAndKey = X509Utilities.createSelfSignedCACert(X500Name("CN=Test Cert,OU=Corda QA Department,O=R3 CEV,L=New York,C=US"))
+        val caCertAndKey = X509Utilities.createSelfSignedCACert(getTestX509Name("Test Cert"))
         X509Utilities.saveCertificateAsPEMFile(caCertAndKey.certificate, tmpCertificateFile)
         val readCertificate = X509Utilities.loadCertificateFromPEMFile(tmpCertificateFile)
         assertEquals(caCertAndKey.certificate, readCertificate)
@@ -51,8 +52,8 @@ class X509UtilitiesTest {
 
     @Test
     fun `create valid server certificate chain`() {
-        val caCertAndKey = X509Utilities.createSelfSignedCACert(X500Name("CN=Test CA Cert,OU=Corda QA Department,O=R3 CEV,L=New York,C=US"))
-        val subjectDN = X500Name("CN=Server Cert,OU=Corda QA Department,O=R3 CEV,L=New York,C=US")
+        val caCertAndKey = X509Utilities.createSelfSignedCACert(getTestX509Name("Test CA Cert"))
+        val subjectDN = getTestX509Name("Server Cert")
         val keyPair = X509Utilities.generateECDSAKeyPairForSSL()
         val serverCert = X509Utilities.createServerCert(subjectDN, keyPair.public, caCertAndKey, listOf("alias name"), listOf("10.0.0.54"))
         assertTrue { serverCert.subjectDN.name.contains("CN=Server Cert") } // using our subject common name

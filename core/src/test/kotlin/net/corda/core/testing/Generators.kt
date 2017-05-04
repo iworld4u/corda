@@ -7,6 +7,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness
 import net.corda.core.contracts.*
 import net.corda.core.crypto.*
 import net.corda.core.serialization.OpaqueBytes
+import net.corda.testing.getTestX509Name
 import org.bouncycastle.asn1.x500.X500Name
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -147,6 +148,6 @@ class X500NameGenerator : Generator<X500Name>(X500Name::class.java) {
         for (word in 0..wordCount) {
             appendProperNoun(cn, random, status).append(" ")
         }
-        return X500Name("CN=${cn.trim()},OU=Corda QA Department,O=R3 CEV,L=New York,C=US")
+        return getTestX509Name(cn.trim().toString())
     }
 }
