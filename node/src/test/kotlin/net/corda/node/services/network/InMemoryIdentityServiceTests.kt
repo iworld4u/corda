@@ -1,7 +1,9 @@
 package net.corda.node.services.network
 
-import net.corda.core.crypto.*
-import net.corda.core.serialization.serialize
+import net.corda.core.crypto.AnonymousParty
+import net.corda.core.crypto.Party
+import net.corda.core.crypto.X509Utilities
+import net.corda.core.crypto.generateKeyPair
 import net.corda.core.utilities.ALICE
 import net.corda.core.utilities.BOB
 import net.corda.node.services.identity.InMemoryIdentityService
@@ -10,10 +12,9 @@ import net.corda.testing.BOB_PUBKEY
 import org.bouncycastle.asn1.x500.X500Name
 import org.junit.Test
 import java.security.InvalidAlgorithmParameterException
-import java.security.Security
 import java.security.cert.*
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 /**
@@ -65,39 +66,49 @@ class InMemoryIdentityServiceTests {
      * Generate a certificate path from a root CA, down to a transaction key, store and verify the association.
      */
     @Test
-    fun `assert anonymous key owned by identity`() {
-        val (rootCertAndKey, txCertAndKey, txCertPath) = generateAnonymousCertificatePath(ALICE.name)
+    fun `assert unknown anonymous key is unrecognised`() {
+        val rootCertAndKey = X509Utilities.createSelfSignedCACert(ALICE.name)
+        val txCertAndKey = X509Utilities.createIntermediateCert(ALICE.name, rootCertAndKey)
         val service = InMemoryIdentityService()
-        val rootCertificate = rootCertAndKey.certificate
         val rootKey = rootCertAndKey.keyPair
         // TODO: Generate certificate with an EdDSA key rather than ECDSA
-        val identity = Party(ALICE.name, rootKey.public)
+        val identity = Party(rootCertAndKey)
         val txIdentity = AnonymousParty(txCertAndKey.keyPair.public)
 
-        service.registerPath(rootCertificate, txIdentity, txCertPath)
-        service.assertOwnership(identity, txIdentity)
+        assertFailsWith<IllegalArgumentException> {
+            service.assertOwnership(identity, txIdentity)
+        }
     }
 
-    // TODO: Ensure an invalid certificate path is rejected
+    /**
+     * Generate a pair of certificate paths from a root CA, down to a transaction key, store and verify the associations.
+     * Also checks that incorrect associations are rejected.
+     */
+    @Test
+    fun `assert ownership`() {
+        val aliceRootCertAndKey = X509Utilities.createSelfSignedCACert(ALICE.name)
+        val aliceTxCertAndKey = X509Utilities.createIntermediateCert(ALICE.name, aliceRootCertAndKey)
+        val aliceCertPath = X509Utilities.createCertificatePath(aliceRootCertAndKey, aliceTxCertAndKey).certPath
+        val bobRootCertAndKey = X509Utilities.createSelfSignedCACert(BOB.name)
+        val bobTxCertAndKey = X509Utilities.createIntermediateCert(BOB.name, bobRootCertAndKey)
+        val bobCertPath = X509Utilities.createCertificatePath(bobRootCertAndKey, bobTxCertAndKey).certPath
+        val service = InMemoryIdentityService()
+        val alice = Party(aliceRootCertAndKey)
+        val anonymousAlice = AnonymousParty(aliceTxCertAndKey.keyPair.public)
+        val bob = Party(bobRootCertAndKey)
+        val anonymousBob = AnonymousParty(bobTxCertAndKey.keyPair.public)
 
-    private fun generateAnonymousCertificatePath(name: X500Name): Triple<X509Utilities.CACertAndKey, X509Utilities.CACertAndKey, CertPath> {
-        val rootCertAndKey = X509Utilities.createSelfSignedCACert(name)
-        val txCertAndKey = X509Utilities.createIntermediateCert(name, rootCertAndKey)
-        val intermediateCertificates = setOf(txCertAndKey.certificate)
-        val certStore = CertStore.getInstance("Collection", CollectionCertStoreParameters(intermediateCertificates))
-        val certPathFactory = CertPathBuilder.getInstance("PKIX")
-        val trustAnchor = TrustAnchor(rootCertAndKey.certificate, null)
-        val pkixBuilderParameters = try {
-            PKIXBuilderParameters(setOf(trustAnchor), X509CertSelector().apply {
-                certificate = txCertAndKey.certificate
-            })
-        } catch (ex: InvalidAlgorithmParameterException) {
-            throw RuntimeException(ex)
-        }.apply {
-            addCertStore(certStore)
-            isRevocationEnabled = false
+        service.registerPath(aliceRootCertAndKey.certificate, anonymousAlice, aliceCertPath)
+        service.registerPath(bobRootCertAndKey.certificate, anonymousBob, bobCertPath)
+
+        // Verify that paths are verified
+        service.assertOwnership(alice, anonymousAlice)
+        service.assertOwnership(bob, anonymousBob)
+        assertFailsWith<IllegalArgumentException> {
+            service.assertOwnership(alice, anonymousBob)
         }
-
-        return Triple(rootCertAndKey, txCertAndKey, certPathFactory.build(pkixBuilderParameters).certPath)
+        assertFailsWith<IllegalArgumentException> {
+            service.assertOwnership(bob, anonymousAlice)
+        }
     }
 }

@@ -11,6 +11,7 @@ import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.X500NameBuilder
 import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x509.*
+import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.bc.BcX509ExtensionUtils
@@ -31,9 +32,8 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.file.Path
 import java.security.*
+import java.security.cert.*
 import java.security.cert.Certificate
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -418,6 +418,24 @@ object X509Utilities {
         cert.verify(certificateAuthority.keyPair.public)
 
         return cert
+    }
+
+    fun createCertificatePath(rootCertAndKey: X509Utilities.CACertAndKey, txCertAndKey: X509Utilities.CACertAndKey): CertPathBuilderResult {
+        val intermediateCertificates = setOf(txCertAndKey.certificate)
+        val certStore = CertStore.getInstance("Collection", CollectionCertStoreParameters(intermediateCertificates))
+        val certPathFactory = CertPathBuilder.getInstance("PKIX")
+        val trustAnchor = TrustAnchor(rootCertAndKey.certificate, null)
+        val certPathParameters = try {
+            PKIXBuilderParameters(setOf(trustAnchor), X509CertSelector().apply {
+                certificate = txCertAndKey.certificate
+            })
+        } catch (ex: InvalidAlgorithmParameterException) {
+            throw RuntimeException(ex)
+        }.apply {
+            addCertStore(certStore)
+            isRevocationEnabled = false
+        }
+        return certPathFactory.build(certPathParameters)
     }
 
     /**

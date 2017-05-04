@@ -25,6 +25,7 @@ import java.security.PublicKey
  * @see CompositeKey
  */
 class Party(val name: X500Name, owningKey: PublicKey) : AbstractParty(owningKey) {
+    constructor(certAndKey: X509Utilities.CACertAndKey) : this(X500Name(certAndKey.certificate.subjectX500Principal.name), certAndKey.keyPair.public)
     override fun toAnonymous(): AnonymousParty = AnonymousParty(owningKey)
     override fun toString() = "${owningKey.toBase58String()} ($name)"
     override fun nameOrNull(): X500Name? = name
