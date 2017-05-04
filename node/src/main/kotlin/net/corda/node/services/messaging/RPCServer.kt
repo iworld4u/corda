@@ -255,7 +255,7 @@ class RPCServer(
     }
 
     private fun reapSubscriptions() {
-        lifeCycle.requireState(State.STARTED)
+        lifeCycle.requireState { it == State.UNSTARTED || it == State.STARTED }
         observableMap.cleanUp()
     }
 

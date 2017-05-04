@@ -22,6 +22,7 @@ import net.corda.testing.node.MockNetwork
 import net.corda.testing.rpcDriver
 import net.corda.testing.rpcTestUser
 import net.corda.testing.startRpcClient
+import org.bouncycastle.cms.RecipientId.password
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
